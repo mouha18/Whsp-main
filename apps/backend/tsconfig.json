@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    // Emit settings
+    "noEmit": false,
+    "outDir": "./dist",
+    "incremental": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+
+    // Language and module settings aligned with Node 18+
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "nodenext",
+
+    // Interop and module hygiene
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    // Strictness for safer code
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUncheckedIndexedAccess": true,
+
+    // Build performance and stability
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Monorepo path mapping (adjust if aliases differ)
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["../../packages/shared/src/*"]
+    },
+
+    // Debugging support
+    "sourceMap": true
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "../frontend/**/*"
+  ]
+}

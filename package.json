@@ -1,0 +1,25 @@
+{
+  "name": "whsp-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix apps/frontend",
+    "dev:backend": "npm run dev --prefix apps/backend",
+    "build:frontend": "npm run build --prefix apps/frontend",
+    "build:backend": "npm run build --prefix apps/backend",
+    "install:all": "npm install && npm run install --workspaces",
+    "lint": "npm run lint --prefix apps/frontend && npm run lint --prefix apps/backend",
+    "test": "npm run test --prefix apps/frontend && npm run test --prefix apps/backend"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "typescript": "^5.4.2"
+  },
+  "dependencies": {
+    "mysql2": "^3.16.3"
+  }
+}
