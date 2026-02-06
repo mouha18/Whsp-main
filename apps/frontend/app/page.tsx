@@ -1,13 +1,88 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download, FileAudio, Trash2 } from 'lucide-react'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import type { RecordingMode } from '@shared/types'
+
+// Recording interface
+interface Recording {
+  id: string
+  format: string
+  durationSeconds: number
+  mode: RecordingMode
+  status: 'uploaded' | 'processing' | 'completed' | 'failed'
+  createdAt: string
+}
 
 export default function HomePage() {
   const [mode, setMode] = useState<RecordingMode>('lecture')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [recordings, setRecordings] = useState<Recording[]>([])
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch recordings on mount
+  useEffect(() => {
+    fetchRecordings()
+  }, [])
+
+  // Fetch recordings from API
+  const fetchRecordings = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/audio')
+      if (response.ok) {
+        const data = await response.json()
+        setRecordings(data.recordings || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch recordings:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Delete recording
+  const deleteRecording = async (id: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (!confirm('Are you sure you want to delete this recording?')) return
+    
+    try {
+      const response = await fetch(`/api/audio/${id}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        setRecordings(prev => prev.filter(r => r.id !== id))
+        if (selectedRecording?.id === id) {
+          setSelectedRecording(null)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete recording:', error)
+    }
+  }
+
+  // Download recording
+  const downloadRecording = async (recording: Recording, event: React.MouseEvent) => {
+    event.stopPropagation()
+    try {
+      const response = await fetch(`/api/audio/${recording.id}/download`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `recording-${recording.id}.${recording.format}`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      }
+    } catch (error) {
+      console.error('Failed to download recording:', error)
+    }
+  }
 
   const {
     isRecording,
@@ -29,6 +104,10 @@ export default function HomePage() {
     },
     onProcessingComplete: (result: { transcript: string; summary: string; confidence: number }) => {
       console.log('Processing complete:', result)
+    },
+    onUploadComplete: () => {
+      // Refresh recordings list after upload
+      fetchRecordings()
     }
   })
 
@@ -256,6 +335,71 @@ export default function HomePage() {
               </div>
             )}
           </div>
+
+          {/* Past Recordings - Phase 2 Exit Criteria */}
+          {recordings.length > 0 && (
+            <div className="card">
+              <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                Past Recordings
+              </h2>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {recordings.map((recording) => (
+                  <div
+                    key={recording.id}
+                    onClick={() => setSelectedRecording(recording)}
+                    className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                      selectedRecording?.id === recording.id
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <FileAudio className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">
+                            {recording.id.slice(0, 20)}...
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {recording.mode} • {formatDuration(recording.durationSeconds * 1000)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          recording.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          recording.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
+                          recording.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {recording.status}
+                        </span>
+                        <button
+                          onClick={(e) => downloadRecording(recording, e)}
+                          className="p-1 hover:bg-gray-200 rounded"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4 text-gray-500" />
+                        </button>
+                        <button
+                          onClick={(e) => deleteRecording(recording.id, e)}
+                          className="p-1 hover:bg-red-100 rounded"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {isLoading && (
+                <div className="text-center py-2">
+                  <Loader2 className="w-4 h-4 animate-spin mx-auto text-gray-400" />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Instructions */}
           <div className="text-center text-xs text-gray-500 space-y-1">
