@@ -20,11 +20,13 @@ export interface UseAudioRecorderProps {
     summary: string
     confidence: number
   }) => void
+  onUploadComplete?: (recordingId: string) => void
   onError?: (error: string) => void
 }
 
 export const useAudioRecorder = ({
   onProcessingComplete,
+  onUploadComplete,
   onError,
 }: UseAudioRecorderProps = {}) => {
   const [state, setState] = useState<RecordingState>({
@@ -175,6 +177,19 @@ export const useAudioRecorder = ({
       // Store recordingId in state
       setState(prev => ({ ...prev, recordingId }))
       
+      // Persist to localStorage for persistence across refreshes
+      try {
+        const existingIds = JSON.parse(localStorage.getItem('recordingIds') || '[]')
+        if (!existingIds.includes(recordingId)) {
+          localStorage.setItem('recordingIds', JSON.stringify([recordingId, ...existingIds]))
+        }
+      } catch (e) {
+        console.error('Failed to persist recording ID:', e)
+      }
+      
+      // Notify parent component
+      onUploadComplete?.(recordingId)
+      
       // Poll for results
       await pollForResults(recordingId)
 
@@ -186,7 +201,7 @@ export const useAudioRecorder = ({
       setState(prev => ({ ...prev, error: errorMessage, isProcessing: false }))
       onError?.(errorMessage)
     }
-  }, [onError])
+  }, [onError, onUploadComplete])
 
   const pollForResults = useCallback(async (recordingId: string) => {
     const maxAttempts = 60 // 5 minutes max

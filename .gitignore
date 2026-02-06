@@ -36,6 +36,14 @@ yarn-error.log*
 coverage/
 .nyc_output/
 
+# Audio files (private recordings)
+*.wav
+*.mp3
+*.webm
+*.ogg
+*.flac
+apps/backend/data/recordings/
+
 # Misc
 *.tsbuildinfo
 .next-env.d.ts
