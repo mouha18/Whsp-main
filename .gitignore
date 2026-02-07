@@ -44,6 +44,23 @@ coverage/
 *.flac
 apps/backend/data/recordings/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
 # Misc
 *.tsbuildinfo
 .next-env.d.ts

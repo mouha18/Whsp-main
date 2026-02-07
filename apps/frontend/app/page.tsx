@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download, FileAudio, Trash2 } from 'lucide-react'
+import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download, FileAudio, Trash2, X, RefreshCw, FileText, Clock, ChevronDown, Copy } from 'lucide-react'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import type { RecordingMode } from '@shared/types'
 
@@ -15,12 +15,37 @@ interface Recording {
   createdAt: string
 }
 
+// Segment interface for timestamped transcription
+interface Segment {
+  start: number
+  end: number
+  text: string
+}
+
+// Transcription result interface
+interface TranscriptionResult {
+  rawText: string
+  cleanText: string
+  confidenceScore: number
+  language: string
+  processingTime: string
+  segments?: Segment[]
+}
+
+// Selected recording with results
+interface RecordingWithResults extends Recording {
+  transcript?: TranscriptionResult
+  isLoadingResults?: boolean
+  resultsError?: string
+}
+
 export default function HomePage() {
   const [mode, setMode] = useState<RecordingMode>('lecture')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
-  const [recordings, setRecordings] = useState<Recording[]>([])
-  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
+  const [recordings, setRecordings] = useState<RecordingWithResults[]>([])
+  const [selectedRecording, setSelectedRecording] = useState<RecordingWithResults | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [resultsLoading, setResultsLoading] = useState(false)
 
   // Fetch recordings on mount
   useEffect(() => {
@@ -127,6 +152,13 @@ export default function HomePage() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
+  const formatTimestamp = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    const ms = Math.floor((seconds % 1) * 1000)
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`
+  }
+
   const getConfidenceColor = (score: number | null) => {
     if (score === null) return 'text-gray-400'
     if (score >= 0.8) return 'text-green-600'
@@ -139,6 +171,93 @@ export default function HomePage() {
     if (score >= 0.8) return 'High Quality'
     if (score >= 0.6) return 'Medium Quality'
     return 'Low Quality'
+  }
+
+  // Fetch transcription results for a recording
+  const fetchTranscriptionResults = async (recording: RecordingWithResults) => {
+    try {
+      setResultsLoading(true)
+      // Update the selected recording to show loading
+      setSelectedRecording(prev => prev?.id === recording.id ? { ...prev, isLoadingResults: true } : prev)
+      
+      const response = await fetch(`/api/audio/${recording.id}/results`)
+      if (response.ok) {
+        const data = await response.json()
+        
+        if (data.status === 'completed' && data.transcript) {
+          setSelectedRecording(prev => 
+            prev?.id === recording.id ? { 
+              ...prev, 
+              status: 'completed',
+              transcript: data.transcript,
+              isLoadingResults: false,
+              resultsError: undefined
+            } : prev
+          )
+        } else if (data.status === 'processing') {
+          // Keep polling for results
+          setTimeout(() => fetchTranscriptionResults(recording), 2000)
+        } else if (data.status === 'failed') {
+          setSelectedRecording(prev => 
+            prev?.id === recording.id ? { 
+              ...prev, 
+              status: 'failed',
+              isLoadingResults: false,
+              resultsError: 'Processing failed'
+            } : prev
+          )
+        }
+      }
+    } catch (error) {
+      setSelectedRecording(prev => 
+        prev?.id === recording.id ? { 
+          ...prev, 
+          isLoadingResults: false,
+          resultsError: 'Failed to fetch results'
+        } : prev
+      )
+    } finally {
+      setResultsLoading(false)
+    }
+  }
+
+  // Handle recording click
+  const handleRecordingClick = async (recording: RecordingWithResults) => {
+    setSelectedRecording(recording)
+    
+    // Only fetch results if not already loaded and not failed
+    if (recording.status === 'completed' && !recording.transcript) {
+      await fetchTranscriptionResults(recording)
+    } else if (recording.status === 'processing') {
+      // Start polling for results
+      fetchTranscriptionResults(recording)
+    }
+  }
+
+  // Retry transcription
+  const retryTranscription = async () => {
+    if (!selectedRecording) return
+    
+    try {
+      setSelectedRecording(prev => prev ? { ...prev, isLoadingResults: true, resultsError: undefined } : null)
+      
+      // Trigger reprocessing by updating the recording
+      const response = await fetch(`/api/audio/${selectedRecording.id}`, {
+        method: 'GET'
+      })
+      
+      if (response.ok) {
+        // Start polling
+        fetchTranscriptionResults(selectedRecording)
+      }
+    } catch (error) {
+      setSelectedRecording(prev => prev ? { ...prev, resultsError: 'Retry failed' } : null)
+    }
+  }
+
+  // Close results panel
+  const closeResults = () => {
+    setSelectedRecording(null)
   }
 
   return (
@@ -167,7 +286,7 @@ export default function HomePage() {
         <div className="w-full max-w-md space-y-6">
           {/* Header */}
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2 bg-red-500">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2 ">
               Audio Transcription
             </h1>
             <p className="text-gray-600 text-sm">
@@ -346,7 +465,7 @@ export default function HomePage() {
                 {recordings.map((recording) => (
                   <div
                     key={recording.id}
-                    onClick={() => setSelectedRecording(recording)}
+                    onClick={() => handleRecordingClick(recording)}
                     className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
                       selectedRecording?.id === recording.id
                         ? 'border-primary-500 bg-primary-50'
@@ -409,6 +528,169 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+
+      {/* Transcription Results Modal */}
+      {selectedRecording && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white w-full max-w-md max-h-[80vh] rounded-t-2xl sm:rounded-xl overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-3">
+                <FileText className="w-5 h-5 text-primary-600" />
+                <div>
+                  <h3 className="font-semibold text-gray-900">Transcription</h3>
+                  <p className="text-xs text-gray-500">
+                    {selectedRecording.mode} • {formatDuration(selectedRecording.durationSeconds * 1000)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeResults}
+                className="p-2 hover:bg-gray-200 rounded-full"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* Status badges */}
+              <div className="flex items-center space-x-2 mb-4">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  selectedRecording.status === 'completed' ? 'bg-green-100 text-green-700' :
+                  selectedRecording.status === 'processing' ? 'bg-yellow-100 text-yellow-700' :
+                  selectedRecording.status === 'failed' ? 'bg-red-100 text-red-700' :
+                  'bg-gray-100 text-gray-700'
+                }`}>
+                  {selectedRecording.status}
+                </span>
+                {selectedRecording.status === 'completed' && selectedRecording.transcript && (
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    getConfidenceColor(selectedRecording.transcript.confidenceScore)
+                  }`}>
+                    {(selectedRecording.transcript.confidenceScore * 100).toFixed(0)}% confidence
+                  </span>
+                )}
+              </div>
+
+              {/* Loading state */}
+              {selectedRecording.isLoadingResults && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary-600" />
+                  <p className="text-gray-600 mt-2">Loading transcription...</p>
+                </div>
+              )}
+
+              {/* Error state */}
+              {!selectedRecording.isLoadingResults && selectedRecording.resultsError && (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-8 h-8 mx-auto text-red-500" />
+                  <p className="text-gray-600 mt-2">{selectedRecording.resultsError}</p>
+                  <button
+                    onClick={retryTranscription}
+                    className="mt-4 btn-secondary flex items-center justify-center space-x-2 mx-auto"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Retry</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Processing state */}
+              {!selectedRecording.isLoadingResults && 
+               !selectedRecording.resultsError && 
+               selectedRecording.status === 'processing' && (
+                <div className="text-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-yellow-500" />
+                  <p className="text-gray-600 mt-2">Transcription in progress...</p>
+                  <p className="text-xs text-gray-400 mt-1">This may take a few minutes</p>
+                </div>
+              )}
+
+              {/* Uploaded/queued state */}
+              {!selectedRecording.isLoadingResults && 
+               !selectedRecording.resultsError && 
+               selectedRecording.status === 'uploaded' && (
+                <div className="text-center py-8">
+                  <Clock className="w-8 h-8 mx-auto text-gray-400" />
+                  <p className="text-gray-600 mt-2">Waiting in queue...</p>
+                  <p className="text-xs text-gray-400 mt-1">Transcription will start shortly</p>
+                </div>
+              )}
+
+              {/* Completed with transcript */}
+              {!selectedRecording.isLoadingResults && 
+               !selectedRecording.resultsError && 
+               selectedRecording.status === 'completed' && 
+               selectedRecording.transcript && (
+                <div className="space-y-4">
+                  {/* Clean transcript */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Clean Transcript</h4>
+                    <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-800 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                      {selectedRecording.transcript.cleanText || 'No transcript available'}
+                    </div>
+                  </div>
+
+                  {/* Segments with timestamps (collapsible) */}
+                  {selectedRecording.transcript.segments && selectedRecording.transcript.segments.length > 0 && (
+                    <details className="group">
+                      <summary className="text-sm font-medium text-gray-700 cursor-pointer flex items-center space-x-2">
+                        <span>Segments ({selectedRecording.transcript.segments.length})</span>
+                        <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
+                      </summary>
+                      <div className="mt-2 bg-gray-50 rounded-lg p-3 text-sm max-h-48 overflow-y-auto space-y-2">
+                        {selectedRecording.transcript.segments.map((segment, index) => (
+                          <div key={index} className="flex space-x-2">
+                            <span className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                              [{formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}]
+                            </span>
+                            <span className="text-gray-700">{segment.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Raw transcript (collapsible) */}
+                  <details className="group">
+                    <summary className="text-sm font-medium text-gray-700 cursor-pointer flex items-center space-x-2">
+                      <span>Raw Transcript</span>
+                      <ChevronDown className="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" />
+                    </summary>
+                    <div className="mt-2 bg-gray-50 rounded-lg p-3 text-sm text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                      {selectedRecording.transcript.rawText || 'No raw transcript available'}
+                    </div>
+                  </details>
+
+                  {/* Processing info */}
+                  <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-200">
+                    <span>Language: {selectedRecording.transcript.language}</span>
+                    <span>Time: {selectedRecording.transcript.processingTime}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {selectedRecording.status === 'completed' && selectedRecording.transcript && (
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => {
+                    const text = selectedRecording.transcript?.cleanText || ''
+                    navigator.clipboard.writeText(text)
+                    alert('Transcript copied to clipboard!')
+                  }}
+                  className="btn-secondary w-full flex items-center justify-center space-x-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>Copy Transcript</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
