@@ -37,13 +37,23 @@ const upload = multer({
 // POST /api/audio - Upload audio file
 router.post('/', upload.single('audio'), async (req, res) => {
   try {
-    const { mode, duration } = req.body
+    const { mode, duration, custom_prompt } = req.body
     const audio = req.file
 
-    if (!audio || !mode) {
+    console.log(`[Backend] Received upload request with mode: "${mode}"`)
+    if (custom_prompt) {
+      console.log(`[Backend] Custom prompt: "${custom_prompt}"`)
+    }
+
+    if (!audio) {
       return res.status(400).json({
-        error: 'Missing audio file or mode'
+        error: 'Missing audio file'
       })
+    }
+
+    if (!mode) {
+      console.warn('[Backend] Mode not provided, defaulting to "lecture"')
+      // Default to lecture if mode not provided
     }
 
     // Validate mode
@@ -82,9 +92,8 @@ router.post('/', upload.single('audio'), async (req, res) => {
       file_path: filePath,
     })
 
-    // Trigger async processing (in Phase 3, this will call the AI service)
-    // For now, simulate async processing
-    processAudioAsync(recordingId).catch(console.error)
+    // Trigger async processing with custom_prompt for custom mode
+    processAudioAsync(recordingId, custom_prompt).catch(console.error)
 
     res.json({
       recordingId,
@@ -137,7 +146,7 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-// GET /api/audio/:id/results - Get processing results
+// GET /api/audio/:id/results - Get processing results (Phase 4 with summary)
 router.get('/:id/results', async (req, res) => {
   try {
     const { id: recordingId } = req.params
@@ -168,7 +177,9 @@ router.get('/:id/results', async (req, res) => {
         error: 'Processing failed'
       })
     } else if (recording.status === 'completed') {
-      // Return real transcription from database
+      // Fetch summary if available - Phase 4
+      const summaryResult = await database.getSummary(recordingId)
+      
       res.json({
         status: 'completed',
         transcript: {
@@ -178,7 +189,13 @@ router.get('/:id/results', async (req, res) => {
           language: recording.language || 'unknown',
           processingTime: recording.processing_time || '0s',
           segments: recording.segments || []
-        }
+        },
+        summary: summaryResult ? {
+          text: summaryResult.summary,
+          mode: summaryResult.mode,
+          tokens: summaryResult.tokens,
+          confidence: summaryResult.confidence
+        } : undefined
       })
     } else {
       // 'uploaded' status
@@ -282,7 +299,7 @@ router.get('/', async (req, res) => {
     console.log(`Found ${recordings.length} recordings`)
     
     res.json({
-      recordings: recordings.map(r => ({
+      recordings: recordings.map((r: any) => ({
         id: r.id,
         format: r.format,
         durationSeconds: r.duration_seconds,
@@ -302,9 +319,9 @@ router.get('/', async (req, res) => {
 })
 
 /**
- * Process audio using the AI service (Phase 3 implementation)
+ * Process audio using the AI service (Phase 3 + Phase 4 implementation)
  */
-async function processAudioAsync(recordingId: string): Promise<void> {
+async function processAudioAsync(recordingId: string, customPrompt?: string): Promise<void> {
   try {
     // Update status to processing
     await database.updateRecordingStatus(recordingId, 'processing')
@@ -321,12 +338,12 @@ async function processAudioAsync(recordingId: string): Promise<void> {
       throw new Error('Audio file not found')
     }
     
-    console.log(`Processing ${recordingId} with AI service...`)
+    console.log(`Processing ${recordingId} with AI service (mode: ${recording.mode})...`)
     
-    // Call AI service
-    const result = await callAIService(audioBuffer, recording.format)
+    // Call AI service with mode and custom_prompt - Phase 4
+    const result = await callAIService(audioBuffer, recording.format, recording.mode, customPrompt)
     
-    // Save transcript to database
+    // Save transcript and summary to database - Phase 4
     await database.saveTranscriptionResult(recordingId, {
       raw_transcript: result.rawTranscript,
       clean_transcript: result.cleanTranscript,
@@ -334,7 +351,12 @@ async function processAudioAsync(recordingId: string): Promise<void> {
       language: result.language,
       processing_time: result.processingTime,
       segments: result.segments
-    })
+    }, result.summary ? {
+      summary: result.summary,
+      mode: result.summaryMode || recording.mode,
+      tokens: result.summaryTokens || 0,
+      confidence: result.confidence
+    } : undefined)
     
     console.log(`Recording ${recordingId} processing complete`)
     
@@ -345,16 +367,19 @@ async function processAudioAsync(recordingId: string): Promise<void> {
 }
 
 /**
- * Call the AI service to process audio
+ * Call the AI service to process audio with mode-aware summarization
  */
 // @ts-ignore - FormData and Blob are available at runtime
-async function callAIService(audioBuffer: Buffer, format: string): Promise<{
+async function callAIService(audioBuffer: Buffer, format: string, mode: RecordingMode = 'lecture', customPrompt?: string): Promise<{
   rawTranscript: string
   cleanTranscript: string
   confidence: number
   language: string
   processingTime: string
   segments: Array<{start: number, end: number, text: string}>
+  summary?: string
+  summaryMode?: string
+  summaryTokens?: number
 }> {
   const form = new FormData()
   
@@ -371,8 +396,13 @@ async function callAIService(audioBuffer: Buffer, format: string): Promise<{
   form.append('model_size', 'base')
   form.append('apply_noise_reduction', 'true')
   form.append('apply_silence_trimming', 'true')
+  form.append('mode', mode)
+  if (customPrompt) {
+    form.append('custom_prompt', customPrompt)
+  }
   
-  const response = await fetch(`${AI_SERVICE_URL}/process`, {
+  // Use the full pipeline endpoint for mode-aware summarization
+  const response = await fetch(`${AI_SERVICE_URL}/process/full`, {
     method: 'POST',
     body: form
     // Note: fetch handles Content-Type automatically with FormData
@@ -388,10 +418,13 @@ async function callAIService(audioBuffer: Buffer, format: string): Promise<{
   return {
     rawTranscript: data.raw_transcript || '',
     cleanTranscript: data.clean_transcript || '',
-    confidence: data.confidence_score || 0,
+    confidence: data.transcription_confidence || data.confidence_score || 0,
     language: data.language || 'unknown',
     processingTime: data.processing_time || '0s',
-    segments: data.segments || []
+    segments: data.segments || [],
+    summary: data.summary,
+    summaryMode: data.summary_mode,
+    summaryTokens: data.summary_tokens
   }
 }
 

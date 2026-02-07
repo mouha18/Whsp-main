@@ -68,6 +68,16 @@ export interface TranscriptionResult {
 }
 
 /**
+ * Summary result interface - Phase 4
+ */
+export interface SummaryResult {
+  summary: string
+  mode: string
+  tokens: number
+  confidence: number
+}
+
+/**
  * Initialize database tables
  */
 export async function initDatabase(): Promise<void> {
@@ -96,13 +106,17 @@ export async function initDatabase(): Promise<void> {
     `)
     
     // Add missing columns to existing table (migration)
-    const columnsToAdd = [
+      const columnsToAdd = [
       'raw_transcript TEXT',
       'clean_transcript TEXT',
       'confidence_score DECIMAL(5,4)',
       'language VARCHAR(10)',
       'processing_time VARCHAR(50)',
-      'segments JSON'
+      'segments JSON',
+      'summary_mode VARCHAR(50)',
+      'summary_text TEXT',
+      'summary_tokens INT',
+      'summary_confidence DECIMAL(5,4)'
     ]
     
     for (const column of columnsToAdd) {
@@ -273,31 +287,66 @@ function mapRowToRecording(row: RowDataPacket): Recording {
  */
 export async function saveTranscriptionResult(
   id: string,
-  result: TranscriptionResult
+  result: TranscriptionResult,
+  summary?: SummaryResult
 ): Promise<Recording | null> {
   const segmentsJson = result.segments ? JSON.stringify(result.segments) : null
   
-  const query = `
+  // Build dynamic query based on whether we have summary data
+  let query = `
     UPDATE recordings 
     SET raw_transcript = ?, clean_transcript = ?, 
         confidence_score = ?, language = ?, 
         processing_time = ?, segments = ?,
         status = 'completed',
         updated_at = NOW()
-    WHERE id = ?
   `
-  
-  await pool.query(query, [
+  const values: any[] = [
     result.raw_transcript,
     result.clean_transcript,
     result.confidence,
     result.language,
     result.processing_time,
     segmentsJson,
-    id
-  ])
+  ]
+  
+  // Add summary fields if provided - Phase 4
+  if (summary) {
+    query += `, summary_mode = ?, summary_text = ?, summary_tokens = ?, summary_confidence = ?`
+    values.push(summary.mode, summary.summary, summary.tokens, summary.confidence)
+  }
+  
+  query += ` WHERE id = ?`
+  values.push(id)
+  
+  await pool.query(query, values)
   
   return getRecording(id)
+}
+
+/**
+ * Get summary for a recording - Phase 4
+ */
+export async function getSummary(id: string): Promise<SummaryResult | null> {
+  const query = 'SELECT summary_mode, summary_text, summary_tokens, summary_confidence FROM recordings WHERE id = ?'
+  const [rows] = await pool.query<RowDataPacket[]>(query, [id])
+  
+  if (rows.length === 0) {
+    return null
+  }
+  
+  const firstRow = rows[0]
+  if (!firstRow || !firstRow.summary_text) {
+    return null
+  }
+  
+  const row = firstRow
+  return {
+    mode: row.summary_mode || 'unknown',
+    summary: row.summary_text,
+    tokens: row.summary_tokens || 0,
+    confidence: row.summary_confidence ? Number(row.summary_confidence) : 0
+  }
 }
 
 /**

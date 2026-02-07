@@ -162,26 +162,36 @@ Produce useful summaries, not generic ones.
 
 Lecture mode:
 
-Structured notes
+Structured notes with concepts and definitions
 
 Meeting mode:
 
-Action items + decisions
+Action items + decisions extraction
 
 Interview mode:
 
-Q/A extraction
+Q/A extraction and speaker intent analysis
 
 Custom mode:
 
 User-defined instructions
 
-Token limits enforced
+Token limits enforced:
+
+- Lecture: 400 tokens
+
+- Meeting: 300 tokens
+
+- Interview: 350 tokens
+
+- Custom: 500 tokens
 
 Qwen 2.5 1.5B integration
 
 📌 Exit Phase 4 when:
 Each mode produces different summaries.
+
+**Status**: ✅ COMPLETED - Mode-aware summarization implemented with Qwen 2.5 1.5B
 
 🔹 PHASE 5 — Results API & UI (Day 5)
 🎯 Goal

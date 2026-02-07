@@ -12,6 +12,13 @@ from faster_whisper import WhisperModel
 from pydantic import BaseModel
 from typing import Optional
 
+# Import summarizer for integrated pipeline
+try:
+    from .summarizer import summarize_transcript, RecordingMode
+    SUMMARIZER_AVAILABLE = True
+except ImportError:
+    SUMMARIZER_AVAILABLE = False
+
 
 class TranscriptionResult(BaseModel):
     """Result from transcription."""
@@ -19,6 +26,27 @@ class TranscriptionResult(BaseModel):
     clean_text: str
     confidence: float
     language: Optional[str] = None
+    segments: Optional[list] = None
+
+
+class SummarizationResult(BaseModel):
+    """Result from summarization."""
+    summary: str
+    mode: str
+    tokens_used: int
+    confidence: float
+
+
+class FullProcessingResult(BaseModel):
+    """Complete result from transcription + summarization pipeline."""
+    raw_text: str
+    clean_text: str
+    summary: Optional[str] = None
+    summary_mode: Optional[str] = None
+    summary_tokens: Optional[int] = None
+    summary_confidence: Optional[float] = None
+    transcription_confidence: float
+    language: str
     segments: Optional[list] = None
 
 
@@ -295,3 +323,60 @@ def transcribe_audio(audio_data: np.ndarray, sample_rate: int,
     """
     processor = get_processor(model_size)
     return processor.transcribe(audio_data, sample_rate, language)
+
+
+def process_and_summarize(
+    audio_data: np.ndarray,
+    sample_rate: int,
+    mode: str = "lecture",
+    custom_prompt: Optional[str] = None,
+    model_size: str = "base",
+    language: Optional[str] = None
+) -> FullProcessingResult:
+    """
+    Full pipeline: Transcribe audio and generate mode-aware summary.
+    
+    Args:
+        audio_data: Audio data as numpy array
+        sample_rate: Sample rate
+        mode: Recording mode for summarization (lecture, meeting, interview, custom)
+        custom_prompt: Custom prompt for custom mode
+        model_size: Whisper model size
+        language: Optional language hint
+    
+    Returns:
+        FullProcessingResult with transcription and optional summary
+    """
+    print(f"[Processor] Starting process_and_summarize with mode: \"{mode}\"")
+    
+    # Step 1: Transcribe
+    processor = get_processor(model_size)
+    transcription = processor.transcribe(audio_data, sample_rate, language)
+    
+    # Initialize result
+    result = FullProcessingResult(
+        raw_text=transcription.raw_text,
+        clean_text=transcription.clean_text,
+        transcription_confidence=transcription.confidence,
+        language=transcription.language or language or "unknown",
+        segments=transcription.segments
+    )
+    
+    # Step 2: Summarize (if summarizer is available)
+    if SUMMARIZER_AVAILABLE and transcription.clean_text:
+        try:
+            print(f"[Processor] Calling summarize_transcript with mode: \"{mode}\"")
+            summary_result = summarize_transcript(
+                transcript=transcription.clean_text,
+                mode=mode,
+                custom_prompt=custom_prompt
+            )
+            result.summary = summary_result.summary
+            result.summary_mode = summary_result.mode
+            result.summary_tokens = summary_result.tokens_used
+            result.summary_confidence = summary_result.confidence
+        except Exception as e:
+            print(f"Summarization error: {e}")
+            result.summary = None
+    
+    return result
