@@ -22,12 +22,14 @@ export interface UseAudioRecorderProps {
   }) => void
   onUploadComplete?: (recordingId: string) => void
   onError?: (error: string) => void
+  customPrompt?: string
 }
 
 export const useAudioRecorder = ({
   onProcessingComplete,
   onUploadComplete,
   onError,
+  customPrompt,
 }: UseAudioRecorderProps = {}) => {
   const [state, setState] = useState<RecordingState>({
     isRecording: false,
@@ -46,7 +48,7 @@ export const useAudioRecorder = ({
   const startTimeRef = useRef<number>(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  const startRecording = useCallback(async (mode: RecordingMode = 'lecture') => {
+  const startRecording = useCallback(async (mode: RecordingMode = 'lecture', customPromptParam?: string) => {
     try {
       setState(prev => ({ ...prev, error: null, isProcessing: false }))
 
@@ -158,10 +160,18 @@ export const useAudioRecorder = ({
 
     setState(prev => ({ ...prev, isProcessing: true, error: null }))
 
+    console.log(`[AudioRecorder] Uploading with mode: "${mode}"`)
+
     try {
       const formData = new FormData()
       formData.append('audio', audioBlob, `recording-${Date.now()}.wav`)
       formData.append('mode', mode)
+      
+      // Add custom_prompt if in custom mode
+      if (mode === 'custom' && customPrompt) {
+        formData.append('custom_prompt', customPrompt)
+        console.log(`[AudioRecorder] Including custom prompt: "${customPrompt}"`)
+      }
 
       const response = await fetch('/api/audio', {
         method: 'POST',
@@ -227,7 +237,7 @@ export const useAudioRecorder = ({
           
           onProcessingComplete?.({
             transcript: data.transcript.cleanText || data.transcript.rawText || '',
-            summary: data.summary?.shortSummary || '',
+            summary: data.summary?.text || '',
             confidence: data.transcript?.confidenceScore || 0
           })
         } else if (data.status === 'failed') {

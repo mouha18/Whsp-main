@@ -35,12 +35,19 @@ interface TranscriptionResult {
 // Selected recording with results
 interface RecordingWithResults extends Recording {
   transcript?: TranscriptionResult
+  summary?: {
+    text: string
+    mode: string
+    tokens: number
+    confidence: number
+  }
   isLoadingResults?: boolean
   resultsError?: string
 }
 
 export default function HomePage() {
   const [mode, setMode] = useState<RecordingMode>('lecture')
+  const [customPrompt, setCustomPrompt] = useState('')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [recordings, setRecordings] = useState<RecordingWithResults[]>([])
   const [selectedRecording, setSelectedRecording] = useState<RecordingWithResults | null>(null)
@@ -133,7 +140,8 @@ export default function HomePage() {
     onUploadComplete: () => {
       // Refresh recordings list after upload
       fetchRecordings()
-    }
+    },
+    customPrompt: customPrompt,
   })
 
   // Handle online/offline status
@@ -190,6 +198,7 @@ export default function HomePage() {
               ...prev, 
               status: 'completed',
               transcript: data.transcript,
+              summary: data.summary,
               isLoadingResults: false,
               resultsError: undefined
             } : prev
@@ -293,6 +302,26 @@ export default function HomePage() {
               Record audio and get AI-powered summaries
             </p>
           </div>
+
+          {/* Custom Prompt Input - visible only when Custom mode is selected */}
+          {mode === 'custom' && (
+            <div className="card">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Custom Instructions
+              </label>
+              <textarea
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                placeholder="e.g., Extract all names and dates mentioned, Summarize in bullet points, Focus on technical terms..."
+                className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                rows={3}
+                disabled={isRecording}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Describe how you want the summary to be formatted
+              </p>
+            </div>
+          )}
 
           {/* Mode Selection */}
           <div className="card">
@@ -416,9 +445,9 @@ export default function HomePage() {
                 </>
               ) : (
                 <button
-                  onClick={() => startRecording(mode)}
+                  onClick={() => startRecording(mode, mode === 'custom' ? customPrompt : undefined)}
                   className="btn-primary flex items-center space-x-2"
-                  disabled={isProcessing}
+                  disabled={isProcessing || (mode === 'custom' && !customPrompt.trim())}
                 >
                   <Mic className="w-5 h-5" />
                   <span>Start Recording</span>
@@ -624,6 +653,24 @@ export default function HomePage() {
                selectedRecording.status === 'completed' && 
                selectedRecording.transcript && (
                 <div className="space-y-4">
+                  {/* Mode-aware Summary */}
+                  {selectedRecording.summary && (
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-primary-800 flex items-center space-x-2">
+                          <FileText className="w-4 h-4" />
+                          <span>AI Summary ({selectedRecording.summary.mode})</span>
+                        </h4>
+                        <span className="text-xs text-primary-600">
+                          {selectedRecording.summary.tokens} tokens
+                        </span>
+                      </div>
+                      <div className="text-sm text-primary-900 whitespace-pre-wrap">
+                        {selectedRecording.summary.text}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Clean transcript */}
                   <div>
                     <h4 className="text-sm font-medium text-gray-700 mb-2">Clean Transcript</h4>
@@ -674,7 +721,20 @@ export default function HomePage() {
 
             {/* Footer */}
             {selectedRecording.status === 'completed' && selectedRecording.transcript && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-2">
+                {selectedRecording.summary && (
+                  <button
+                    onClick={() => {
+                      const text = selectedRecording.summary?.text || ''
+                      navigator.clipboard.writeText(text)
+                      alert('Summary copied to clipboard!')
+                    }}
+                    className="btn-primary w-full flex items-center justify-center space-x-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Copy Summary ({selectedRecording.summary.mode})</span>
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const text = selectedRecording.transcript?.cleanText || ''

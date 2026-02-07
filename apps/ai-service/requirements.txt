@@ -8,3 +8,5 @@ pydantic>=2.5.0
 numpy>=1.26.0
 scipy>=1.11.0
 torch
+transformers>=4.40.0
+accelerate>=0.28.0
