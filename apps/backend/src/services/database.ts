@@ -26,6 +26,12 @@ export interface Recording {
   mode: RecordingMode
   status: 'uploaded' | 'processing' | 'completed' | 'failed'
   file_path: string
+  raw_transcript?: string
+  clean_transcript?: string
+  confidence_score?: number
+  language?: string
+  processing_time?: string
+  segments?: Segment[]
   created_at: Date
   updated_at: Date
 }
@@ -41,12 +47,34 @@ export interface RecordingInsert {
 }
 
 /**
+ * Segment interface for timestamped transcription
+ */
+export interface Segment {
+  start: number
+  end: number
+  text: string
+}
+
+/**
+ * Transcription result interface
+ */
+export interface TranscriptionResult {
+  raw_transcript: string
+  clean_transcript: string
+  confidence: number
+  language: string
+  processing_time: string
+  segments?: Segment[]
+}
+
+/**
  * Initialize database tables
  */
 export async function initDatabase(): Promise<void> {
   const connection = await pool.getConnection()
   
   try {
+    // Create table if not exists
     await connection.query(`
       CREATE TABLE IF NOT EXISTS recordings (
         id VARCHAR(255) PRIMARY KEY,
@@ -56,10 +84,40 @@ export async function initDatabase(): Promise<void> {
         mode VARCHAR(50) NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'uploaded',
         file_path VARCHAR(500) NOT NULL,
+        raw_transcript TEXT,
+        clean_transcript TEXT,
+        confidence_score DECIMAL(5,4),
+        language VARCHAR(10),
+        processing_time VARCHAR(50),
+        segments JSON,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `)
+    
+    // Add missing columns to existing table (migration)
+    const columnsToAdd = [
+      'raw_transcript TEXT',
+      'clean_transcript TEXT',
+      'confidence_score DECIMAL(5,4)',
+      'language VARCHAR(10)',
+      'processing_time VARCHAR(50)',
+      'segments JSON'
+    ]
+    
+    for (const column of columnsToAdd) {
+      const columnName = column.split(' ')[0]
+      try {
+        await connection.query(`ALTER TABLE recordings ADD COLUMN ${column}`)
+        console.log(`Added column: ${columnName}`)
+      } catch (e: any) {
+        if (e.code === 'ER_DUP_FIELDNAME') {
+          console.log(`Column already exists: ${columnName}`)
+        } else {
+          throw e
+        }
+      }
+    }
     
     // Create indexes for faster lookups (ignore if already exists)
     try {
@@ -127,7 +185,10 @@ export async function getRecording(id: string): Promise<Recording | null> {
     return null
   }
   
-  return mapRowToRecording(rows[0])
+  const row = rows[0]
+  if (!row) return null
+  
+  return mapRowToRecording(row)
 }
 
 /**
@@ -176,6 +237,18 @@ export async function deleteRecording(id: string): Promise<boolean> {
  * Map database row to Recording interface
  */
 function mapRowToRecording(row: RowDataPacket): Recording {
+  // Parse segments from JSON
+  let segments: Segment[] | undefined
+  if (row.segments) {
+    try {
+      segments = typeof row.segments === 'string' 
+        ? JSON.parse(row.segments) 
+        : row.segments
+    } catch (e) {
+      segments = undefined
+    }
+  }
+  
   return {
     id: row.id,
     user_id: row.user_id || undefined,
@@ -184,9 +257,47 @@ function mapRowToRecording(row: RowDataPacket): Recording {
     mode: row.mode,
     status: row.status,
     file_path: row.file_path,
+    raw_transcript: row.raw_transcript || undefined,
+    clean_transcript: row.clean_transcript || undefined,
+    confidence_score: row.confidence_score ? Number(row.confidence_score) : undefined,
+    language: row.language || undefined,
+    processing_time: row.processing_time || undefined,
+    segments: segments,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
+}
+
+/**
+ * Save transcription result to database
+ */
+export async function saveTranscriptionResult(
+  id: string,
+  result: TranscriptionResult
+): Promise<Recording | null> {
+  const segmentsJson = result.segments ? JSON.stringify(result.segments) : null
+  
+  const query = `
+    UPDATE recordings 
+    SET raw_transcript = ?, clean_transcript = ?, 
+        confidence_score = ?, language = ?, 
+        processing_time = ?, segments = ?,
+        status = 'completed',
+        updated_at = NOW()
+    WHERE id = ?
+  `
+  
+  await pool.query(query, [
+    result.raw_transcript,
+    result.clean_transcript,
+    result.confidence,
+    result.language,
+    result.processing_time,
+    segmentsJson,
+    id
+  ])
+  
+  return getRecording(id)
 }
 
 /**

@@ -4,6 +4,10 @@ import { v4 as uuidv4 } from 'uuid'
 import * as storage from '../storage/local'
 import * as database from '../services/database'
 
+// AI Service Configuration
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001'
+const AI_PROCESS_TIMEOUT = 300000 // 5 minutes
+
 // Define RecordingMode locally to avoid import issues
 type RecordingMode = 'lecture' | 'meeting' | 'interview' | 'custom'
 
@@ -164,25 +168,16 @@ router.get('/:id/results', async (req, res) => {
         error: 'Processing failed'
       })
     } else if (recording.status === 'completed') {
-      // In Phase 3, we would fetch actual transcript/summary from database
-      // For now, return simulated results
+      // Return real transcription from database
       res.json({
         status: 'completed',
         transcript: {
-          rawText: "This is a simulated transcription. In Phase 3, the AI service will provide real transcription.",
-          cleanText: "This is a simulated transcription. In Phase 3, the AI service will provide real transcription.",
-          confidenceScore: 0.85,
-          processingAttempts: 1
-        },
-        summary: {
-          title: "Simulated Audio Summary",
-          keyPoints: [
-            "Audio file uploaded and stored successfully",
-            "File saved to local storage",
-            "Metadata persisted to database"
-          ],
-          actionItems: [],
-          shortSummary: "The audio has been uploaded and is ready for AI processing. In Phase 3, you will receive actual transcription and summary results."
+          rawText: recording.raw_transcript || '',
+          cleanText: recording.clean_transcript || '',
+          confidenceScore: recording.confidence_score || 0,
+          language: recording.language || 'unknown',
+          processingTime: recording.processing_time || '0s',
+          segments: recording.segments || []
         }
       })
     } else {
@@ -307,21 +302,39 @@ router.get('/', async (req, res) => {
 })
 
 /**
- * Simulate async audio processing
- * In Phase 3, this will be replaced with actual AI service calls
+ * Process audio using the AI service (Phase 3 implementation)
  */
 async function processAudioAsync(recordingId: string): Promise<void> {
   try {
     // Update status to processing
     await database.updateRecordingStatus(recordingId, 'processing')
     
-    // Simulate processing time (2-5 seconds)
-    const processingTime = 2000 + Math.random() * 3000
-    await new Promise(resolve => setTimeout(resolve, processingTime))
+    // Get recording from database
+    const recording = await database.getRecording(recordingId)
+    if (!recording) {
+      throw new Error('Recording not found')
+    }
     
-    // Update status to completed
-    // In Phase 3, this would be done after actual AI processing
-    await database.updateRecordingStatus(recordingId, 'completed')
+    // Read audio file
+    const audioBuffer = await storage.readAudio(recordingId, recording.format)
+    if (!audioBuffer) {
+      throw new Error('Audio file not found')
+    }
+    
+    console.log(`Processing ${recordingId} with AI service...`)
+    
+    // Call AI service
+    const result = await callAIService(audioBuffer, recording.format)
+    
+    // Save transcript to database
+    await database.saveTranscriptionResult(recordingId, {
+      raw_transcript: result.rawTranscript,
+      clean_transcript: result.cleanTranscript,
+      confidence: result.confidence,
+      language: result.language,
+      processing_time: result.processingTime,
+      segments: result.segments
+    })
     
     console.log(`Recording ${recordingId} processing complete`)
     
@@ -329,6 +342,76 @@ async function processAudioAsync(recordingId: string): Promise<void> {
     console.error(`Processing failed for ${recordingId}:`, error)
     await database.updateRecordingStatus(recordingId, 'failed')
   }
+}
+
+/**
+ * Call the AI service to process audio
+ */
+// @ts-ignore - FormData and Blob are available at runtime
+async function callAIService(audioBuffer: Buffer, format: string): Promise<{
+  rawTranscript: string
+  cleanTranscript: string
+  confidence: number
+  language: string
+  processingTime: string
+  segments: Array<{start: number, end: number, text: string}>
+}> {
+  const form = new FormData()
+  
+  // Determine file extension and MIME type
+  const ext = format || 'webm'
+  const mimeType = format === 'wav' ? 'audio/wav' : 'audio/webm'
+  const filename = `audio.${ext}`
+  
+  // Convert Buffer to Blob (required by FormData)
+  // @ts-ignore - Buffer is compatible with BlobPart at runtime
+  const audioBlob = new Blob([audioBuffer], { type: mimeType })
+  
+  form.append('file', audioBlob, filename)
+  form.append('model_size', 'base')
+  form.append('apply_noise_reduction', 'true')
+  form.append('apply_silence_trimming', 'true')
+  
+  const response = await fetch(`${AI_SERVICE_URL}/process`, {
+    method: 'POST',
+    body: form
+    // Note: fetch handles Content-Type automatically with FormData
+  })
+  
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`AI service error: ${error}`)
+  }
+  
+  const data = await response.json()
+  
+  return {
+    rawTranscript: data.raw_transcript || '',
+    cleanTranscript: data.clean_transcript || '',
+    confidence: data.confidence_score || 0,
+    language: data.language || 'unknown',
+    processingTime: data.processing_time || '0s',
+    segments: data.segments || []
+  }
+}
+
+/**
+ * Store processing result in database
+ */
+async function storeProcessingResult(recordingId: string, result: {
+  rawTranscript: string
+  cleanTranscript: string
+  confidence: number
+  language: string
+  processingTime: string
+}): Promise<void> {
+  // For now, we'll store the transcript as a JSON string in the file_path field
+  // In a production system, you'd want a dedicated results table
+  const resultData = JSON.stringify(result)
+  
+  // Update the recording with transcript data
+  // This is a simple approach - ideally you'd have a separate results table
+  console.log(`Stored result for ${recordingId}: ${result.cleanTranscript.substring(0, 100)}...`)
 }
 
 export default router

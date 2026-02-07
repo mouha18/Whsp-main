@@ -109,6 +109,8 @@ Deployable: Supabase integration
 📌 Exit Phase 2 when:
 Audio survives page refresh and has an ID.
 
+**Status**: ✅ COMPLETED - Frontend persistence fix, recordings list UI, localStorage
+
 🔹 PHASE 3 — AI Processing Pipeline (Core) (Day 3–4)
 🎯 Goal
 
@@ -138,8 +140,18 @@ Clean transcript
 
 Confidence score
 
+Backend integration:
+
+Node.js calls AI service
+
+Async processing
+
+Result storage
+
 📌 Exit Phase 3 when:
 You can upload audio and receive clean text.
+
+**Status**: ✅ COMPLETED - Python FastAPI service with faster-whisper, audio preprocessing, backend integration
 
 🔹 PHASE 4 — Mode-Aware Summarization (Day 4)
 🎯 Goal
