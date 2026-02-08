@@ -135,10 +135,11 @@ All API endpoints (except auth) require JWT validation:
 - Ownership checks ensure users can only access their own data
 
 ### STEP 1: Upload Audio
-POST /api/recordings
+POST /api/audio
 Purpose
 - Upload microphone recording
 - Create a Recording entity
+- Automatically triggers AI processing
 
 Request
 ```json
@@ -152,27 +153,26 @@ Content-Type: multipart/form-data
 Response
 ```json
 {
-  "recordingId": "recording_123",
-  "status": "uploaded"
+  "recordingId": "rec_123_abc",
+  "status": "uploaded",
+  "message": "Audio uploaded successfully. Processing has started."
 }
 ```
 
-### STEP 2: Start AI Processing
-POST /api/recordings/{recordingId}/process
+### STEP 2: Poll for Status (Optional)
+GET /api/audio/{recordingId}
 Purpose
-- Trigger AI pipeline asynchronously
+- Check recording status without fetching full results
 
-Backend Actions
-- Validate recording
-- Send audio to AI service
-- Update status → processing
-- Track processing attempts
-
-Response
+Response (while processing)
 ```json
 {
-  "recordingId": "recording_123",
-  "status": "processing"
+  "id": "rec_123_abc",
+  "format": "webm",
+  "durationSeconds": 120,
+  "mode": "lecture",
+  "status": "processing",
+  "createdAt": "ISO-8601"
 }
 ```
 
@@ -204,7 +204,7 @@ AI Pipeline Order (STRICT)
 Output stored in database.
 
 ### STEP 4: Fetch Results
-GET /api/recordings/{recordingId}/results
+GET /api/audio/{recordingId}/results
 Purpose
 - Retrieve transcript + summary
 
@@ -228,31 +228,29 @@ Response
 ```
 
 ### STEP 5: Export Document
-POST /api/recordings/{recordingId}/export
+GET /api/export?recordingId={recordingId}&format={md|docx|pdf}
 Purpose
-- Generate downloadable document
+- Generate and download document directly
 
+Response
+- File download (Markdown, DOCX, or PDF)
+
+**Alternative POST endpoint:**
+POST /api/export
 Request
 ```json
 {
-  "format": "pdf | md | docx"
+  "recordingId": "rec_123_abc",
+  "format": "md"
 }
 ```
-
-Backend Actions
-- Render content from transcript and summary
-- Apply formatting template
-- Generate file
-- Store in appropriate storage (local filesystem or Supabase)
-- Create signed URL for download
 
 Response
 ```json
 {
   "exportId": "export_123",
-  "downloadUrl": "signed-url",
-  "expiresAt": "ISO-8601",
-  "format": "pdf"
+  "downloadUrl": "/api/export/export_123",
+  "format": "md"
 }
 ```
 

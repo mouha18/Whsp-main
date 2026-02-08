@@ -148,7 +148,14 @@ project-root/
 - **User**: Authentication and ownership
 - **Recording**: Audio metadata and processing status
 - **Transcript**: Raw and cleaned text with confidence scores
+- **Summary**: Generated AI summary with mode
 - **Export**: Generated documents and download references
+
+### Recording Status States
+- **uploaded**: Audio file received, processing will start
+- **processing**: AI pipeline active
+- **completed**: All processing stages successful
+- **failed**: Processing failed after retries
 
 ### Constraints
 - Raw and cleaned transcripts are always preserved

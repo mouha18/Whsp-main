@@ -1,359 +1,205 @@
-### Example of a Roadmap.md Update
-
-```markdown
 # 🧩 Project Roadmap: Audio → Transcript → Summary → Export App
 
-Goal
+**Status**: ✅ All Phases COMPLETED - v1.0.0 Released
 
-What you build
+---
 
-When to move on
+## Quick Reference
 
-🔹 PHASE 0 — Foundation (COMPLETED)
-🎯 Goal
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 0 | ✅ | Foundation (Tech stack, architecture) |
+| Phase 1 | ✅ | Audio Recording (Frontend) |
+| Phase 2 | ✅ | Audio Upload API (Backend) |
+| Phase 3 | ✅ | AI Processing Pipeline (Core) |
+| Phase 4 | ✅ | Mode-Aware Summarization |
+| Phase 5 | ✅ | Results API & UI |
+| Phase 6 | ✅ | Export System |
+| Phase 7 | ✅ | Polish & Safety |
 
+---
+
+## 🔹 PHASE 0 — Foundation (COMPLETED)
+
+### 🎯 Goal
 Lock decisions so you don't change direction mid-build.
 
-✅ Tasks
+### ✅ Tasks
+- **Tech Stack Finalized:**
+  - Frontend: Next.js + TypeScript
+  - Backend: Node.js (Express)
+  - AI Service: Python + FastAPI
 
-Choose final tech stack
+- **Models Decided:**
+  - STT: faster-whisper (local C++ implementation)
+  - LLM: Qwen 2.5 1.5B
 
-Frontend: Next.js + TypeScript
+- **Database:**
+  - Local: MySQL
+  - Deployable: Supabase
 
-Backend: Node.js (API routes or Express)
+- **Authentication:**
+  - Local: No auth required
+  - Deployable: Google Auth via Supabase
 
-AI Service: Python + FastAPI
-
-Decide models
-
-STT: faster-whisper
-
-LLM: Qwen 2.5 1.5B
-
-Create repo
-
-Add:
-
-.Qwenrules
-
-ARCHITECTURE.md
-
-API_FLOW.md
-
-Database setup:
-
-Local version: MySQL
-
-Deployable version: Supabase
-
-Authentication setup:
-
-Local version: No auth required
-
-Deployable version: Google Auth
-
-📌 Exit Phase 0 when:
+### 📌 Exit Criteria
 You can explain the dual-version system in 2 minutes without confusion.
 
-**Status**: ✅ COMPLETED - All documentation files updated with resolved decisions
+---
 
-🔹 PHASE 1 — Audio Recording (Frontend) (Day 1–2)
-🎯 Goal
+## 🔹 PHASE 1 — Audio Recording (Frontend) (COMPLETED)
 
+### 🎯 Goal
 Capture usable audio from the microphone.
 
-✅ Tasks
+### ✅ Tasks
+- Mic permission handling
+- Start / stop recording
+- Display recording status
+- Save audio as WAV or WebM
+- Chunk audio (≤30s)
 
-Mic permission handling
-
-Start / stop recording
-
-Display recording status
-
-Save audio as WAV or FLAC
-
-Chunk audio (≤30s)
-
-❌ Do NOT
-
-Process audio yet
-
-Add AI
-
-Add export
-
-📌 Exit Phase 1 when:
+### 📌 Exit Criteria
 You can download a clean audio file locally.
 
-🔹 PHASE 2 — Audio Upload API (Backend) (Day 2)
-🎯 Goal
+---
 
+## 🔹 PHASE 2 — Audio Upload API (Backend) (COMPLETED)
+
+### 🎯 Goal
 Send audio from frontend to backend reliably.
 
-✅ Tasks
+### ✅ Tasks
+- `POST /api/audio` - Upload audio endpoint
+- Store audio in local filesystem
+- Save metadata (duration, mode)
+- MySQL database integration
+- Recordings list API
 
-POST /api/audio
-
-Store audio (local or object storage)
-
-Save metadata (duration, mode, userId for deployable version)
-
-Return audioId
-
-Database integration:
-
-Local: MySQL schema
-
-Deployable: Supabase integration
-
-📌 Exit Phase 2 when:
+### 📌 Exit Criteria
 Audio survives page refresh and has an ID.
 
-**Status**: ✅ COMPLETED - Frontend persistence fix, recordings list UI, localStorage
+---
 
-🔹 PHASE 3 — AI Processing Pipeline (Core) (Day 3–4)
-🎯 Goal
+## 🔹 PHASE 3 — AI Processing Pipeline (Core) (COMPLETED)
 
+### 🎯 Goal
 Turn audio into clean text.
 
-✅ Tasks
+### ✅ Tasks
+- Python FastAPI service on port 8001
+- Audio preprocessing:
+  - Noise reduction (spectral gating)
+  - Silence trimming (RMS threshold)
+  - Convert to mono WAV (16kHz)
+- Speech-to-text using faster-whisper
+- Transcript cleanup (remove filler words)
+- Return: raw transcript, clean transcript, confidence score
 
-Python FastAPI service
-
-Implement pipeline:
-
-Noise reduction
-
-Silence trimming
-
-Chunking
-
-Speech-to-text (faster-whisper)
-
-Transcript cleanup
-
-Return:
-
-Raw transcript
-
-Clean transcript
-
-Confidence score
-
-Backend integration:
-
-Node.js calls AI service
-
-Async processing
-
-Result storage
-
-📌 Exit Phase 3 when:
+### 📌 Exit Criteria
 You can upload audio and receive clean text.
 
-**Status**: ✅ COMPLETED - Python FastAPI service with faster-whisper, audio preprocessing, backend integration
+---
 
-🔹 PHASE 4 — Mode-Aware Summarization (Day 4)
-🎯 Goal
+## 🔹 PHASE 4 — Mode-Aware Summarization (COMPLETED)
 
+### 🎯 Goal
 Produce useful summaries, not generic ones.
 
-✅ Tasks
+### ✅ Tasks
+- **Lecture mode:** Structured notes with concepts and definitions
+- **Meeting mode:** Action items + decisions extraction
+- **Interview mode:** Q/A extraction and speaker intent analysis
+- **Custom mode:** User-defined instructions
+- Token limits enforced:
+  - Lecture: 400 tokens
+  - Meeting: 300 tokens
+  - Interview: 350 tokens
+  - Custom: 500 tokens
+- Qwen 2.5 1.5B integration
 
-Lecture mode:
-
-Structured notes with concepts and definitions
-
-Meeting mode:
-
-Action items + decisions extraction
-
-Interview mode:
-
-Q/A extraction and speaker intent analysis
-
-Custom mode:
-
-User-defined instructions
-
-Token limits enforced:
-
-- Lecture: 400 tokens
-
-- Meeting: 300 tokens
-
-- Interview: 350 tokens
-
-- Custom: 500 tokens
-
-Qwen 2.5 1.5B integration
-
-📌 Exit Phase 4 when:
+### 📌 Exit Criteria
 Each mode produces different summaries.
 
-**Status**: ✅ COMPLETED - Mode-aware summarization implemented with Qwen 2.5 1.5B
+---
 
-🔹 PHASE 5 — Results API & UI (Day 5)
-🎯 Goal
+## 🔹 PHASE 5 — Results API & UI (COMPLETED)
 
+### 🎯 Goal
 Let users see what the AI produced.
 
-✅ Tasks
+### ✅ Tasks
+- `GET /api/audio/{id}/results` - Results endpoint
+- UI with tabs for:
+  - Raw transcript
+  - Clean transcript
+  - AI Summary
+  - Confidence warnings
+- Polling for processing status
+- Copy to clipboard functionality
 
-GET /api/audio/{id}/results
-
-UI tabs:
-
-Raw transcript
-
-Clean transcript
-
-Summary
-
-Confidence warning if low quality
-
-Authentication integration (deployable version):
-
-Google Auth flow
-
-JWT token handling
-
-User isolation
-
-📌 Exit Phase 5 when:
+### 📌 Exit Criteria
 User can read everything without confusion.
 
-**Status**: ✅ COMPLETED - Results API endpoint, UI tabs for Raw/Clean transcript, Summary, and confidence warnings
+---
 
-🔹 PHASE 6 — Export System (Day 6)
-🎯 Goal
+## 🔹 PHASE 6 — Export System (COMPLETED)
 
+### 🎯 Goal
 Turn results into files people actually use.
 
-✅ Tasks
+### ✅ Tasks
+- `POST /api/export` and `GET /api/export`
+- Templates:
+  - Markdown (.md)
+  - DOCX (.docx)
+  - PDF (.pdf)
+- Local filesystem storage
+- Frontend export buttons
 
-POST /api/export
-
-Templates:
-
-Markdown
-
-DOCX
-
-PDF
-
-Signed download URLs
-
-Storage integration:
-
-Local: File system storage
-
-Deployable: Supabase storage
-
-📌 Exit Phase 6 when:
+### 📌 Exit Criteria
 User downloads a clean, readable document.
 
-**Status**: ✅ COMPLETED - Export API with Markdown/DOCX/PDF support, local filesystem storage, frontend export buttons
+---
 
-🔹 PHASE 7 — Polish & Safety (Day 7)
-🎯 Goal
+## 🔹 PHASE 7 — Polish & Safety (COMPLETED)
 
+### 🎯 Goal
 Make it reliable and professional.
 
-✅ Tasks
+### ✅ Tasks
+- Error handling with retry logic (1 retry on failure)
+- UI loading states and spinners
+- Configurable audio deletion (`DELETE_AUDIO_AFTER_EXPORT`)
+- Structured JSON logging
+- AES-256-GCM encryption for audio
+- Input sanitization utilities
 
-Error handling - ✅ Retry logic with exponential backoff (1 retry on failure)
-
-Loading states - ✅ UI spinners for upload/processing/export
-
-Delete audio after export (configurable) - ✅ Via DELETE_AUDIO_AFTER_EXPORT env var
-
-Basic logging - ✅ Structured JSON logging with levels
-
-Security hardening:
-
-AES-256 encryption for audio - ✅ AES-256-GCM encryption utility
-
-JWT token validation - ⏭️ SKIPPED (local version only, no auth)
-
-Database security - ✅ Input sanitization utilities
-
-📌 Exit Phase 7 when:
+### 📌 Exit Criteria
 You'd feel okay letting someone else use it.
 
-**Status**: ✅ COMPLETED - All Phase 7 tasks completed except JWT (skipped for local version)
+---
 
-🔹 PHASE 8 — Future Work
-🎯 Goal
+## 🔹 PHASE 8 — Future Work (v2+)
 
-Next steps for v2+ development.
+### 📋 Planned Features
+- **Real-time transcription** - Live transcription during recording
+- **Speaker diarization** - Multi-speaker identification
+- **Custom summary prompts** - Free-form user instructions
+- **Cloud deployment** - Vercel, Railway, etc.
+- **Mobile app** - React Native implementation
+- **Testing framework** - Comprehensive test coverage
+- **Advanced analytics** - Usage metrics and monitoring
+- **Autoscaling** - Dynamic infrastructure
 
-📋 Completed Infrastructure:
-
-- Error handling with retry logic
-- Structured logging system
-- AES-256-GCM audio encryption
-- Input sanitization utilities
-- Configurable audio deletion
-- Database security measures
-
-📋 Configuration Options (Environment Variables):
-
-- `DELETE_AUDIO_AFTER_EXPORT=true` - Delete audio after export
-- `AUDIO_ENCRYPTION_KEY=...` - AES-256 encryption key
-- `LOG_LEVEL=debug|info|warn|error` - Logging level
-- `AI_RETRY_COUNT=1` - Number of retry attempts
-
-🧩 OPTIONAL PHASES (After MVP - v2+)
-
-**Real-time transcription** (Deferred from v1)
-- Live transcription during recording
-- Streaming inference capabilities
-
-**Speaker diarization**
-- Multi-speaker identification and separation
-- Speaker-specific transcript organization
-
-**Custom summary prompts**
-- Free-form user-defined summarization instructions
-- Advanced prompt engineering interface
-
-**Cloud deployment (Vercel, Railway, etc.)**
-- Production deployment automation
-- Environment management and scaling
-
-**Mobile app (React Native)**
-- Native mobile experience
-- Offline recording capabilities
-
-**Testing framework implementation**
-- Comprehensive test coverage
-- Performance and load testing
-
-**Advanced analytics and usage metrics**
-- User behavior tracking
-- Performance monitoring and optimization
-
-**Autoscaling infrastructure support**
-- Dynamic resource allocation
-- Cost optimization for cloud deployments
-
-🔁 The Golden Rule (IMPORTANT)
-
-Never build two phases at once
-
-Each phase must:
-✔ Work
-✔ Be testable
-✔ Be committed
-
-Then move on.
+---
 
 ## v1 vs v2+ Feature Matrix
 
 | Feature | v1 Status | v2+ Plans |
 |---------|-----------|-----------|
-| Batch audio processing | ✅ Included | - |
+| Audio recording | ✅ Included | - |
+| Batch processing | ✅ Included | - |
 | Mode-specific summarization | ✅ Included | - |
 | Document export (DOCX/MD/PDF) | ✅ Included | - |
 | Dual deployment (Local/Cloud) | ✅ Included | - |
@@ -361,6 +207,18 @@ Then move on.
 | Real-time transcription | ❌ Deferred | Streaming inference |
 | Speaker diarization | ❌ Deferred | Multi-speaker support |
 | Custom summary prompts | ❌ Deferred | Free-form prompts |
-| Mobile app | ❌ Deferred | React Native implementation |
-| Advanced analytics | ❌ Deferred | Usage metrics and monitoring |
-| Autoscaling | ❌ Deferred | Dynamic infrastructure |
+| Mobile app | ❌ Deferred | React Native |
+| Advanced analytics | ❌ Deferred | Usage metrics |
+
+---
+
+## 🔁 The Golden Rule
+
+Never build two phases at once.
+
+Each phase must:
+- ✅ Work
+- ✅ Be testable
+- ✅ Be committed
+
+Then move on.

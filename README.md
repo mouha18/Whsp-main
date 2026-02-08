@@ -1,183 +1,163 @@
 # Whsp - Audio Transcription & Summarization App
 
-## Step 1 Implementation: Audio Recording Frontend
+A complete, production-ready audio transcription and summarization application. Record audio, get AI-powered transcriptions with mode-aware summaries, and export to multiple formats.
 
-This is the implementation of **Step 1** from the project roadmap - a mobile-first, minimalist audio recording application with recording/processing status and confidence indicators.
+## 🎯 Features
 
-### 🎯 Features Implemented
+- **Audio Recording** - Record audio directly in the browser with real-time status indicators
+- **AI Transcription** - Speech-to-text using faster-whisper (local C++ implementation)
+- **Mode-Aware Summarization** - Four modes: Lecture, Meeting, Interview, Custom
+- **Export Options** - Export to Markdown, DOCX, or PDF formats
+- **Security** - AES-256 encryption for stored audio
+- **Dual Deployment** - Local (MySQL) or Cloud (Supabase) versions
 
-- **Mobile-First Design**: Responsive UI optimized for mobile devices
-- **Microphone Permission Handling**: Automatic permission requests with user guidance
-- **Recording Controls**: Start/stop recording with visual feedback
-- **Status Indicators**: Clear visual states for Recording, Processing, and Error states
-- **Confidence Display**: Real-time confidence score visualization
-- **Mode Selection**: Support for Lecture, Meeting, Interview, and Custom modes
-- **Error Handling**: User-readable error messages with recovery options
-- **Audio Upload**: Integration with backend API for processing
-- **Functional Programming**: Clean, reusable hooks and components
+## 🏗️ Architecture
 
-### 🏗️ Architecture
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Frontend (Next.js)                    │
+│                  apps/frontend (Port 3000)                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Backend (Express.js)                    │
+│                   apps/backend (Port 3001)                   │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│   │  /api/audio │  │ /api/export │  │  MySQL Database    │  │
+│   └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    AI Service (FastAPI)                      │
+│                apps/ai-service (Port 8001)                   │
+│   ┌────────────────┐  ┌──────────────────────────────────┐  │
+│   │ faster-whisper  │  │ Qwen 2.5 1.5B (Summarization)    │  │
+│   │ (Transcription) │  │                                  │  │
+│   └────────────────┘  └──────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
 
-#### Frontend Stack
-- **Next.js 14** with App Router
-- **TypeScript** for type safety
-- **Tailwind CSS** for styling
-- **React Hooks** for state management
-- **Functional Programming Patterns**
+## 📁 Project Structure
 
-#### Key Components
+```
+whsp-main/
+├── apps/
+│   ├── frontend/          # Next.js web application
+│   ├── backend/          # Express.js API server
+│   └── ai-service/       # FastAPI AI processing service
+├── packages/
+│   └── shared/           # Shared types and constants
+├── docs/                 # Documentation
+│   ├── Architecture.md
+│   ├── API_Flow.md
+│   ├── Roadmap.md
+│   └── Architecture_Validation.md
+└── package.json          # Workspace root
+```
 
-1. **`useAudioRecorder` Hook** (`src/hooks/useAudioRecorder.ts`)
-   - Manages microphone access and recording state
-   - Handles audio chunking and blob creation
-   - Implements automatic upload after recording
-   - Polls for processing results
-   - Provides error handling and recovery
+## 🚀 Getting Started
 
-2. **Main Page** (`src/app/page.tsx`)
-   - Mobile-first minimalist UI
-   - Mode selection interface
-   - Recording controls with status indicators
-   - Confidence score display
-   - Error message handling
+### Prerequisites
 
-3. **API Routes**
-   - `POST /api/recordings` - Handle audio uploads
-   - `GET /api/recordings/[id]/results` - Poll for processing results
+- Node.js 18+
+- Python 3.10+
+- MySQL (for local deployment)
 
-### 🚀 Getting Started
+### Installation
 
-#### Prerequisites
-- Node.js (version 18 or higher)
-- npm or yarn
+1. Clone the repository:
+```bash
+git clone https://github.com/mouha18/Whsp-main.git
+cd Whsp-main
+```
 
-#### Installation
-
-1. Install dependencies:
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Start development server:
+3. Configure environment:
+```bash
+# Backend
+cp apps/backend/.env.example apps/backend/.env
+# Edit .env with your database credentials
+
+# AI Service
+# No extra config needed for local AI service
+```
+
+4. Initialize database:
+```bash
+# Create MySQL database and run migrations
+mysql -u root -p < apps/backend/schema.sql
+```
+
+5. Start services:
+
+**Terminal 1 - Frontend:**
 ```bash
 npm run dev
 ```
 
-3. Open your browser and navigate to `http://localhost:3000`
+**Terminal 2 - Backend:**
+```bash
+cd apps/backend
+npm run dev
+```
 
-#### Testing
+**Terminal 3 - AI Service:**
+```bash
+cd apps/ai-service
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8001
+```
 
-A test page is available at `/test` to verify functionality:
-- Visit `http://localhost:3000/test`
-- Check browser console for detailed logs
-- Test microphone permissions and recording
+6. Open http://localhost:3000
 
-### 📱 UI Features
+## 📖 Documentation
 
-#### Status Bar
-- Online/offline status indicator
-- App branding
+- [Architecture](docs/Architecture.md) - System design overview
+- [API Flow](docs/API_Flow.md) - API specifications
+- [Roadmap](docs/Roadmap.md) - Project phases
+- [Architecture Validation](docs/Architecture_Validation.md) - Team sign-off
 
-#### Mode Selection
-- **Lecture**: Structured notes mode
-- **Meeting**: Action items mode  
-- **Interview**: Q/A extraction mode
-- **Custom**: User-defined instructions mode
+## 🎛️ Configuration
 
-#### Recording Interface
-- **Start Recording**: Large, accessible button
-- **Stop Recording**: Red stop button during recording
-- **Duration Display**: Real-time timer in MM:SS format
-- **Status Indicators**: Visual feedback for all states
-- **Confidence Score**: Color-coded quality indicator
+### Environment Variables
 
-#### Error Handling
-- Clear error messages in user-friendly language
-- Error state styling with red indicators
-- Recovery options and retry guidance
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_HOST` | MySQL host | localhost |
+| `DB_USER` | MySQL user | root |
+| `DB_PASSWORD` | MySQL password | - |
+| `DB_NAME` | Database name | whsp |
+| `PORT` | Backend port | 3001 |
+| `AI_SERVICE_URL` | AI service URL | http://localhost:8001 |
+| `DELETE_AUDIO_AFTER_EXPORT` | Auto-delete audio after export | false |
+| `AUDIO_ENCRYPTION_KEY` | AES-256 encryption key | - |
 
-### 🔧 Technical Details
+## 📝 API Endpoints
 
-#### Audio Processing Pipeline
-1. **Microphone Access**: Request permissions with echo cancellation
-2. **Recording**: Capture audio in 1-second chunks
-3. **Format**: Prefer WAV format, fallback to WebM
-4. **Upload**: Automatic upload after recording stops
-5. **Polling**: Check for results every 5 seconds (max 5 minutes)
-6. **Results**: Display transcript and summary with confidence
+### Audio
+- `POST /api/audio` - Upload audio file
+- `GET /api/audio/:id` - Get recording info
+- `GET /api/audio/:id/results` - Get transcription results
+- `DELETE /api/audio/:id` - Delete recording
+- `GET /api/audio/:id/download` - Download audio file
 
-#### State Management
-- **Recording State**: `isRecording`, `isProcessing`, `duration`
-- **Audio Data**: `audioBlob` for upload
-- **Quality Metrics**: `confidence` score display
-- **Error Handling**: `error` messages with user guidance
+### Export
+- `GET /api/export?recordingId=xxx&format=md|docx|pdf` - Download export
+- `POST /api/export` - Create export
 
-#### Responsive Design
-- **Mobile-First**: Optimized for touch interactions
-- **Accessible**: Large buttons and clear typography
-- **Minimalist**: Clean design without distractions
-- **Performance**: Optimized for low-latency inference
+## 🔒 Security
 
-### 🧪 Testing the Implementation
+- AES-256-GCM encryption for stored audio
+- Structured JSON logging
+- Input sanitization
+- JWT validation (Supabase version)
 
-#### Manual Testing Steps
+## 📄 License
 
-1. **Permission Testing**
-   - Visit the main page
-   - Click "Start Recording"
-   - Grant microphone permission when prompted
-   - Verify recording starts successfully
-
-2. **Recording Functionality**
-   - Record for 5-10 seconds
-   - Click "Stop Recording"
-   - Verify upload begins automatically
-   - Check processing status
-
-3. **Error Scenarios**
-   - Deny microphone permission
-   - Verify error message displays
-   - Test with no microphone connected
-   - Check network error handling
-
-4. **UI Responsiveness**
-   - Test on mobile devices
-   - Verify touch interactions work
-   - Check different screen sizes
-   - Test orientation changes
-
-#### API Testing
-
-The API routes simulate the full processing pipeline:
-- Audio upload endpoint accepts form data
-- Results endpoint simulates processing with random outcomes
-- Error handling for missing data and server errors
-
-### 📋 Next Steps (Phase 2+)
-
-This implementation completes **Step 1** of the roadmap. The next phases would include:
-
-- **Phase 2**: Audio Upload API (Backend)
-- **Phase 3**: AI Processing Pipeline (Core)
-- **Phase 4**: Mode-Aware Summarization
-- **Phase 5**: Results API & UI
-- **Phase 6**: Export System
-- **Phase 7**: Polish & Safety
-
-### 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-### 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-### 🔗 Related Documentation
-
-- [API Flow](docs/API_Flow.md) - Complete API specifications
-- [Architecture](docs/Architecture.md) - System design decisions
-- [Roadmap](docs/Roadmap.md) - Project phases and timeline
+MIT License - see LICENSE file for details.
