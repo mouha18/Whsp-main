@@ -17,9 +17,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.5",
+    "@types/pdfkit": "^0.17.4",
     "typescript": "^5.4.2"
   },
   "dependencies": {
-    "mysql2": "^3.16.3"
+    "docx": "^9.5.1",
+    "mysql2": "^3.16.3",
+    "pdfkit": "^0.17.2"
   }
 }

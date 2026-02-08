@@ -64,3 +64,8 @@ build/
 # Misc
 *.tsbuildinfo
 .next-env.d.ts
+
+#Report
+*.docx
+*.pdf
+*.md

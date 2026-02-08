@@ -2,8 +2,9 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import audioRoutes from './routes/audio'
-import { initDatabase, closeDatabase } from './services/database'
+import audioRoutes from './routes/audio.js'
+import exportRoutes from './routes/export.js'
+import { initDatabase, closeDatabase } from './services/database.js'
 
 console.log('DB env check', { user: process.env.DB_USER, hasPassword: !!process.env.DB_PASSWORD });
 
@@ -28,6 +29,9 @@ app.get('/health', (req, res) => {
 
 // Audio API routes
 app.use('/api/audio', audioRoutes)
+
+// Export API routes
+app.use('/api/export', exportRoutes)
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

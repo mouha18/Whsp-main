@@ -253,6 +253,8 @@ Deployable: Supabase storage
 📌 Exit Phase 6 when:
 User downloads a clean, readable document.
 
+**Status**: ✅ COMPLETED - Export API with Markdown/DOCX/PDF support, local filesystem storage, frontend export buttons
+
 🔹 PHASE 7 — Polish & Safety (Day 7)
 🎯 Goal
 

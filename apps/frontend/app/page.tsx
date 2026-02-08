@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download, FileAudio, Trash2, X, RefreshCw, FileText, Clock, ChevronDown, Copy } from 'lucide-react'
+import { Mic, Square, Loader2, AlertCircle, CheckCircle2, Wifi, WifiOff, Pause, Play, Download, FileAudio, Trash2, X, RefreshCw, FileText, Clock, ChevronDown, Copy, File } from 'lucide-react'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import type { RecordingMode } from '@shared/types'
 
@@ -53,6 +53,7 @@ export default function HomePage() {
   const [selectedRecording, setSelectedRecording] = useState<RecordingWithResults | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [resultsLoading, setResultsLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState<string | null>(null) // format being exported
 
   // Fetch recordings on mount
   useEffect(() => {
@@ -267,6 +268,24 @@ export default function HomePage() {
   // Close results panel
   const closeResults = () => {
     setSelectedRecording(null)
+  }
+
+  // Export recording to file - uses GET with query params for direct download
+  const exportRecording = (format: 'md' | 'docx' | 'pdf') => {
+    if (!selectedRecording) return
+    
+    setExportLoading(format)
+    
+    // Build URL with query params
+    const url = `/api/export?recordingId=${encodeURIComponent(selectedRecording.id)}&format=${encodeURIComponent(format)}`
+    
+    // Open in new tab/window which triggers download
+    window.open(url, '_blank')
+    
+    // Reset loading after a short delay
+    setTimeout(() => {
+      setExportLoading(null)
+    }, 2000)
   }
 
   return (
@@ -721,7 +740,47 @@ export default function HomePage() {
 
             {/* Footer */}
             {selectedRecording.status === 'completed' && selectedRecording.transcript && (
-              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-2">
+              <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 space-y-3">
+                {/* Export buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => exportRecording('md')}
+                    disabled={exportLoading !== null}
+                    className="btn-secondary flex items-center justify-center space-x-1 text-sm"
+                  >
+                    {exportLoading === 'md' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    <span>Markdown</span>
+                  </button>
+                  <button
+                    onClick={() => exportRecording('docx')}
+                    disabled={exportLoading !== null}
+                    className="btn-secondary flex items-center justify-center space-x-1 text-sm"
+                  >
+                    {exportLoading === 'docx' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <File className="w-4 h-4" />
+                    )}
+                    <span>DOCX</span>
+                  </button>
+                  <button
+                    onClick={() => exportRecording('pdf')}
+                    disabled={exportLoading !== null}
+                    className="btn-secondary flex items-center justify-center space-x-1 text-sm"
+                  >
+                    {exportLoading === 'pdf' ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <File className="w-4 h-4" />
+                    )}
+                    <span>PDF</span>
+                  </button>
+                </div>
+                
                 {selectedRecording.summary && (
                   <button
                     onClick={() => {
