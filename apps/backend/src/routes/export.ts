@@ -1,6 +1,7 @@
 import express from 'express'
 import * as database from '../services/database.js'
 import * as exportService from '../services/export.js'
+import * as storage from '../storage/local.js'
 import * as templates from '../templates/markdown.js'
 import { generateDocx } from '../templates/docx.js'
 import { generatePdf } from '../templates/pdf.js'
@@ -8,6 +9,9 @@ import { generatePdf } from '../templates/pdf.js'
 const router = express.Router()
 
 type ExportFormat = 'md' | 'docx' | 'pdf'
+
+// Configuration for audio deletion after export (Phase 7)
+const DELETE_AUDIO_AFTER_EXPORT = process.env.DELETE_AUDIO_AFTER_EXPORT === 'true'
 
 /**
  * GET /api/export - Download export directly (simplest approach)
@@ -101,7 +105,16 @@ router.get('/', async (req, res) => {
     )
     res.setHeader('Content-Length', buffer.length)
 
+    // Send file
     res.send(buffer)
+
+    // Delete audio file after successful export (Phase 7)
+    if (DELETE_AUDIO_AFTER_EXPORT) {
+      console.log(`[Export] Deleting audio file after export: ${recordingId}`)
+      await storage.deleteRecording(recordingId)
+      await database.updateRecordingStatus(recordingId, 'completed') // Keep DB for records
+      console.log(`[Export] Audio file deleted: ${recordingId}`)
+    }
 
   } catch (error) {
     console.error('Export error:', error)

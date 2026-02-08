@@ -7,6 +7,7 @@ import * as database from '../services/database'
 // AI Service Configuration
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001'
 const AI_PROCESS_TIMEOUT = 300000 // 5 minutes
+const AI_RETRY_COUNT = 1 // Retry once on failure
 
 // Define RecordingMode locally to avoid import issues
 type RecordingMode = 'lecture' | 'meeting' | 'interview' | 'custom'
@@ -320,50 +321,72 @@ router.get('/', async (req, res) => {
 
 /**
  * Process audio using the AI service (Phase 3 + Phase 4 implementation)
+ * With retry logic - Phase 7
  */
 async function processAudioAsync(recordingId: string, customPrompt?: string): Promise<void> {
-  try {
-    // Update status to processing
-    await database.updateRecordingStatus(recordingId, 'processing')
-    
-    // Get recording from database
-    const recording = await database.getRecording(recordingId)
-    if (!recording) {
-      throw new Error('Recording not found')
+  let lastError: Error | null = null
+  
+  // Try up to AI_RETRY_COUNT + 1 times (initial + retries)
+  for (let attempt = 0; attempt <= AI_RETRY_COUNT; attempt++) {
+    try {
+      // Update status to processing
+      await database.updateRecordingStatus(recordingId, 'processing')
+      
+      // Get recording from database
+      const recording = await database.getRecording(recordingId)
+      if (!recording) {
+        throw new Error('Recording not found')
+      }
+      
+      // Read audio file
+      const audioBuffer = await storage.readAudio(recordingId, recording.format)
+      if (!audioBuffer) {
+        throw new Error('Audio file not found')
+      }
+      
+      if (attempt === 0) {
+        console.log(`[${recordingId}] Starting AI processing (mode: ${recording.mode})`)
+      } else {
+        console.log(`[${recordingId}] Retry attempt ${attempt}/${AI_RETRY_COUNT}`)
+      }
+      
+      // Call AI service with mode and custom_prompt - Phase 4
+      const result = await callAIService(audioBuffer, recording.format, recording.mode, customPrompt)
+      
+      // Save transcript and summary to database - Phase 4
+      await database.saveTranscriptionResult(recordingId, {
+        raw_transcript: result.rawTranscript,
+        clean_transcript: result.cleanTranscript,
+        confidence: result.confidence,
+        language: result.language,
+        processing_time: result.processingTime,
+        segments: result.segments
+      }, result.summary ? {
+        summary: result.summary,
+        mode: result.summaryMode || recording.mode,
+        tokens: result.summaryTokens || 0,
+        confidence: result.confidence
+      } : undefined)
+      
+      console.log(`[${recordingId}] Processing complete (confidence: ${result.confidence.toFixed(2)})`)
+      return // Success - exit the function
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.error(`[${recordingId}] Attempt ${attempt + 1} failed:`, lastError.message)
+      
+      if (attempt < AI_RETRY_COUNT) {
+        // Wait before retry (exponential backoff: 1s, 2s, 4s...)
+        const delayMs = Math.pow(2, attempt) * 1000
+        console.log(`[${recordingId}] Retrying in ${delayMs}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+      }
     }
-    
-    // Read audio file
-    const audioBuffer = await storage.readAudio(recordingId, recording.format)
-    if (!audioBuffer) {
-      throw new Error('Audio file not found')
-    }
-    
-    console.log(`Processing ${recordingId} with AI service (mode: ${recording.mode})...`)
-    
-    // Call AI service with mode and custom_prompt - Phase 4
-    const result = await callAIService(audioBuffer, recording.format, recording.mode, customPrompt)
-    
-    // Save transcript and summary to database - Phase 4
-    await database.saveTranscriptionResult(recordingId, {
-      raw_transcript: result.rawTranscript,
-      clean_transcript: result.cleanTranscript,
-      confidence: result.confidence,
-      language: result.language,
-      processing_time: result.processingTime,
-      segments: result.segments
-    }, result.summary ? {
-      summary: result.summary,
-      mode: result.summaryMode || recording.mode,
-      tokens: result.summaryTokens || 0,
-      confidence: result.confidence
-    } : undefined)
-    
-    console.log(`Recording ${recordingId} processing complete`)
-    
-  } catch (error) {
-    console.error(`Processing failed for ${recordingId}:`, error)
-    await database.updateRecordingStatus(recordingId, 'failed')
   }
+  
+  // All retries failed
+  console.error(`[${recordingId}] Processing failed after ${AI_RETRY_COUNT + 1} attempts`)
+  await database.updateRecordingStatus(recordingId, 'failed')
 }
 
 /**
